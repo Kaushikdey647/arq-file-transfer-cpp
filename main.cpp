@@ -1,5 +1,5 @@
 #include "lib/framing.h"
-#include "lib/go_back_n_arq.h"
+// #include "lib/go_back_n_arq.h"
 
 int main()
 {

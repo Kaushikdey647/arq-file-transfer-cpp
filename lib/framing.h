@@ -9,7 +9,7 @@ class framing{
         int file_size;
         string file_url;
         hash<string> hash_fn;
-
+        int sockfd;
     public:
     
         vector<char *> frames;
@@ -17,13 +17,12 @@ class framing{
         /**
          * @brief Construct a new framing object
          * 
-         * @param frame_size 
-         * @param hash_size 
+         * @param frame_size
          * @param file_url 
          * 
          * Frame Breakdown: frame_size + 8 for hash + 8 for index
          */
-        framing( string file_url, int frame_size, int hash_size){
+        framing( string file_url, int frame_size){
 
             // ASSIGNMENTS
             this->frame_size = frame_size;
@@ -56,9 +55,6 @@ class framing{
             // CLOSE THE FILE
             infile.close();
 
-            for(auto e: frames){
-                cout << e << endl;
-            }
             
         }
         
