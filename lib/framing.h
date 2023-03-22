@@ -7,7 +7,6 @@ class framing{
     private:
         int frame_size;
         int file_size;
-        string file_url;
         hash<string> hash_fn;
         int sockfd;
     public:
@@ -22,23 +21,27 @@ class framing{
          * 
          * Frame Breakdown: frame_size + 8 for hash + 8 for index
          */
-        framing( string file_url, int frame_size){
+        framing(int frame_size){
 
             // ASSIGNMENTS
             this->frame_size = frame_size;
-            this->file_url = file_url;
+            
+        }
+
+        void encode_frames(string file_url){
+
             // OPEN FILE AS BINARY
             ifstream infile(file_url, ios::binary);
 
             if (!infile.is_open())
             {
-                cout << "Failed to open file\n";
-                return;
+                throw "File not found";
             }
 
-            // PUSH THE FILE NAME AND EXTENSION INTO THE VECTOR
+            // PUSH EXTENSION INTO THE VECTOR
             char* ext = new char[frame_size + 16];
             memcpy(ext, file_url.substr(file_url.find_last_of(".")+1).c_str(), frame_size*sizeof(char));
+            
             frames.push_back(ext);
 
 
@@ -54,8 +57,6 @@ class framing{
 
             // CLOSE THE FILE
             infile.close();
-
-            
         }
         
         void add_checksum(char* frame){
@@ -65,6 +66,19 @@ class framing{
             // convert hash to char array
             memcpy(frame+frame_size, &hash, 8*sizeof(char));
 
+        }
+
+        void add_index(char* frame, int index){
+                
+            // convert hash to char array
+            memcpy(frame+frame_size+8, &index, 8*sizeof(char));
+    
+        }
+
+        int get_index(char* frame){
+            int index;
+            memcpy(&index, frame+frame_size+8, 8*sizeof(char));
+            return index;
         }
 
         bool verify_checksum(char* frame){
