@@ -33,14 +33,14 @@ void arq_socket_listen(const char* ip, int port ){
         exit(0);
     }
 
-    cout << "[DEBUG]: SOCKET CREATED WITH SOCKFD: " << sockfd << endl;
+    cout << "\33[32m[DEBUG]: SOCKET CREATED WITH SOCKFD: " << sockfd << endl;
 
     struct sockaddr_in serv_addr;
 
-    cout << "[DEBUG]: SOCKET STRUCT CREATED" << endl;
-    cout << "[DEBUG]: SOCKET STRUCT SIZE: " << sizeof(serv_addr) << endl;
-    cout << "[DEBUG]: SOCKET STRUCT PORT: " << port << endl;
-    cout << "[DEBUG]: SOCKET STRUCT IP: " << ip << endl;
+    cout << "\33[32m[DEBUG]: SOCKET STRUCT CREATED" << endl;
+    cout << "\33[32m[DEBUG]: SOCKET STRUCT SIZE: " << sizeof(serv_addr) << endl;
+    cout << "\33[32m[DEBUG]: SOCKET STRUCT PORT: " << port << endl;
+    cout << "\33[32m[DEBUG]: SOCKET STRUCT IP: " << ip << endl;
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -54,33 +54,33 @@ void arq_socket_listen(const char* ip, int port ){
 
 
     if (conn < 0) {
-        cout << "[ERROR]: FAILED TO BIND" << endl;
+        cout << "\33[31m[ERROR]: FAILED TO BIND" << endl;
         exit(0);
     }
 
-    cout << "[DEBUG]: SOCKET BINDED" << endl;
+    cout << "\33[32m[DEBUG]: SOCKET BINDED" << endl;
 
-    cout << "[DEBUG]: LISTENING SOCKFD: " << sockfd << endl;
+    cout << "\33[32m[DEBUG]: LISTENING SOCKFD: " << sockfd << endl;
 
     if( listen(sockfd, 1) < 0){
-        cout << "[ERROR]: FAILED TO LISTEN" << endl;
+        cout << "\33[31m[ERROR]: FAILED TO LISTEN" << endl;
         exit(0);
     }
 }
 
 void send_ack(){
 
-    cout << "[DEBUG]: SENDING ACK" << endl;
+    cout << "\33[32m[DEBUG]: SENDING ACK" << endl;
     send(connfd, ack_values, window_size*sizeof(int), 0);
     
-    cout << "[DEBUG]: ACK SENT" << endl;
+    cout << "\33[32m[DEBUG]: ACK SENT" << endl;
 
     //reset the ack_values array
     for(int i=0; i<window_size; i++){
         ack_values[i] = 0;
     }
 
-    cout << "[DEBUG]: ACK VALUES RESET" << endl;
+    cout << "\33[32m[DEBUG]: ACK VALUES RESET" << endl;
 
     //reset the start_index from first zero
     for(int i=0; i<window_size; i++){
@@ -92,10 +92,10 @@ void send_ack(){
         }
     }
 
-    cout << "[DEBUG]: START INDEX RESET" << endl;
+    cout << "\33[32m[DEBUG]: START INDEX RESET" << endl;
 }
 
-int accept_conn(){
+void accept_conn(){
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
@@ -107,11 +107,11 @@ int accept_conn(){
     );
     
     if (connfd < 0) {
-        cout << "[ERROR]: FAILED TO ACCEPT" << endl;
+        cout << "\33[31m[ERROR]: FAILED TO ACCEPT" << endl;
         exit(0);
     }
 
-    cout << "[DEBUG]: CONNECTION ACCEPTED" << endl;
+    cout << "\33[32m[DEBUG]: CONNECTION ACCEPTED" << endl;
 
 }
 
@@ -126,11 +126,11 @@ void recieve_file(const char* folder_path){
 
     int arr_size = 0;
 
-    cout << "[DEBUG]: READING ARRAY SIZE" << endl;
+    cout << "\33[32m[DEBUG]: READING ARRAY SIZE" << endl;
 
     sendval = read(connfd, &arr_size, sizeof(int));
 
-    cout << "[DEBUG]: ARRAY SIZE RECIEVED: " << arr_size << endl;
+    cout << "\33[32m[DEBUG]: ARRAY SIZE RECIEVED: " << arr_size << endl;
 
     //initialize the frames vector
 
@@ -139,34 +139,34 @@ void recieve_file(const char* folder_path){
     while(true){
         //recieve packets
 
-        cout << "[DEBUG]: READING PACKET" << endl;
+        cout << "\33[32m[DEBUG]: READING PACKET" << endl;
 
         char* packet = new char[frame_size+16];
 
-        cout << "[DEBUG]: PACKET CREATED" << endl;
+        cout << "\33[32m[DEBUG]: PACKET CREATED" << endl;
 
         sendval = read(connfd, packet, frame_size+16);
 
         //get index
 
-        cout << "[DEBUG]: GETTING INDEX" << endl;
+        cout << "\33[32m[DEBUG]: GETTING INDEX" << endl;
 
         int index = sendfile.get_index(packet);
 
-        cout << "[DEBUG]: PACKET RECIEVED: " << index << endl;
+        cout << "\33[32m[DEBUG]: PACKET RECIEVED: " << index << endl;
 
         //verify checksum and give acknowledgement
 
         if(sendfile.verify_checksum(packet)){
             
-            cout << "[DEBUG]: CHECKSUM VERIFIED" << endl;
+            cout << "\33[32m[DEBUG]: CHECKSUM VERIFIED" << endl;
 
             frames[index] = packet;
             ack_values[index-start_index] = 1;
         }
         else{
 
-            cout << "[DEBUG]: CHECKSUM FAILED" << endl;
+            cout << "\33[32m[DEBUG]: CHECKSUM FAILED" << endl;
 
             //delete packet
             delete[] packet;
@@ -187,7 +187,7 @@ void recieve_file(const char* folder_path){
 
     sendfile.frames = frames;
 
-    cout << "[DEBUG]: WRITING TO FILE" << endl;
+    cout << "\33[32m[DEBUG]: WRITING TO FILE" << endl;
 
     sendfile.decode_frames(folder_path);
 }

@@ -1,8 +1,10 @@
 #include "lib/framing.h"
 #include <bits/stdc++.h>
 #include <sys/socket.h> // for socket
+#include <sys/types.h>
 #include <netinet/in.h> // for sockaddr_in
 #include <arpa/inet.h>  // for inet_addr and htons
+#include <netdb.h>
 #include <unistd.h> //for close and shit
 #include <iostream>
 
@@ -29,7 +31,7 @@ void arq_sock_connect(const char* ip, int port ){
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if( sockfd < 0 ){
-        cout << "[ERROR]: SOCKET CREATION FAILED" << endl;
+        cout << "\33[31m[ERROR]: SOCKET CREATION FAILED" << endl;
         exit(0);
     }
 
@@ -38,9 +40,22 @@ void arq_sock_connect(const char* ip, int port ){
     struct sockaddr_in serv_addr;
 
     memset(&serv_addr, 0, sizeof(serv_addr));
+
+    struct hostent *host = (struct hostent *) gethostbyname(ip);
+
+    if (host == NULL) {
+        cout << "\33[31m[ERROR]: HOST NOT FOUND" << endl;
+        exit(0);
+    }
+
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    serv_addr.sin_addr.s_addr = inet_addr(ip);
+
+    memcpy(
+        &serv_addr.sin_addr,
+        host->h_addr_list[0],
+        host->h_length
+    );
 
     cout << "\33[32m[DEBUG]: SOCKET STRUCT CREATED" << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT SIZE: " << sizeof(serv_addr) << endl;
