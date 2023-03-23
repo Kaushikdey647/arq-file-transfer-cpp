@@ -37,6 +37,8 @@ void arq_sock_connect(const char* ip, int port ){
 
     cout << "\33[32m[DEBUG]: SOCKET CREATED WITH SOCKFD: " << sockfd << endl;
 
+    // Getting Server
+
     struct sockaddr_in serv_addr;
 
     memset(&serv_addr, 0, sizeof(serv_addr));
@@ -62,6 +64,7 @@ void arq_sock_connect(const char* ip, int port ){
     cout << "\33[32m[DEBUG]: SOCKET STRUCT PORT: " << port << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT IP: " << ip << endl;
 
+    //Attempting connection to server
 
     connfd = connect(
         sockfd,

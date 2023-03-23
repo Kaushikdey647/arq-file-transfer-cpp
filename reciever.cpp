@@ -37,6 +37,9 @@ void arq_socket_listen(const char* ip, int port ){
 
     struct sockaddr_in serv_addr;
 
+    //flush the struct
+    memset(&serv_addr, 0, sizeof(serv_addr));
+
     cout << "\33[32m[DEBUG]: SOCKET STRUCT CREATED" << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT SIZE: " << sizeof(serv_addr) << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT PORT: " << port << endl;
@@ -44,7 +47,8 @@ void arq_socket_listen(const char* ip, int port ){
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    serv_addr.sin_addr.s_addr = inet_addr(ip);
+    // serv_addr.sin_addr.s_addr = inet_addr(ip);
+    serv_addr.sin_addr.s_addr = htons(INADDR_ANY);
 
     int conn = bind(
         sockfd,
