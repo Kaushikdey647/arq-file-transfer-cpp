@@ -69,9 +69,9 @@ class framing{
         }
 
         void add_index(char* frame, int index){
-                
+            int temp = index;
             // convert hash to char array
-            memcpy(frame+frame_size+8, &index, 8*sizeof(char));
+            memcpy(frame+frame_size+8, &temp, 8*sizeof(char));
     
         }
 

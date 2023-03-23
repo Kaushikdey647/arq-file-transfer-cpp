@@ -79,43 +79,31 @@ void arq_sock_connect(const char* ip, int port ){
 }
 
 void recieve_ack(){
-    while(true){
 
-        //lock mutex
-        arq_lock.lock();
+    int ack = read(sockfd, ack_values, window_size);
 
-        cout << "\33[32m[DEBUG]: MUTEX LOCK" << endl;
+    cout << "\33[32m[DEBUG]: ACK READ VALUE: " << ack << endl;
 
-        int ack = recv(connfd, ack_values, window_size, 0);
-
-        cout << "\33[32m[DEBUG]: RECIEVED ACK VALUES" << endl;
-
-        // update start_index
-        for(int i=0; i<window_size; i++){
-            if(ack_values[i] == 1){
-                start_index++;
-                if (start_index == frames.size()){
-                    return;
-                }
-            }else{
-                break;
+    // update start_index
+    for(int i=0; i<window_size; i++){
+        if(ack_values[i] == 1){
+            start_index++;
+            if (start_index == frames.size()){
+                return;
             }
+        }else{
+            break;
         }
-
-        cout << "\33[32m[DEBUG]: UPDATED START INDEX" << endl;
-
-        // flush the ack values
-        for(int i=0; i<window_size; i++){
-            ack_values[i] = 0;
-        }
-
-        cout << "\33[32m[DEBUG]: FLUSHED ACK VALUES" << endl;
-
-        //unlock mutex
-        arq_lock.unlock();
-
-        cout << "\33[32m[DEBUG]: MUTEX UNLOCK" << endl;
     }
+
+    cout << "\33[32m UPDATE ";
+
+    // flush the ack values
+    for(int i=0; i<window_size; i++){
+        ack_values[i] = 0;
+    }
+
+    cout << "\33[32m FLUSH" << endl;
 }
 
 void send_file(string file_url){
@@ -130,55 +118,55 @@ void send_file(string file_url){
     //copyy sendfile.frames to frames
     frames = sendfile.frames;
 
-
     //send array size:
 
     int array_size = sendfile.frames.size();
+    
+    sendval = write(sockfd, &array_size, sizeof(array_size));
 
-    sendval = send(connfd, &array_size, sizeof(int), 0);
+    cout << "\33[32m[DEBUG]: SENDVAL: " << sendval << endl;
 
     cout << "\33[32m[DEBUG]: SENT ARRAY SIZE: " << array_size << endl;
-
-    //init thread
-
-    thread recv_ack(recieve_ack);
     
+    sleep(1);
+
     //send frames
 
     while(true){
-            
-        //lock mutex
-        arq_lock.lock();
 
         for(int i=start_index; i<start_index+window_size; i++){
             char* frame = sendfile.frames[i];
             // add hash
 
-            cout << "\33[32m[DEBUG]: ADDING HASH" << endl;
+            cout << "\33[32m[DEBUG]: FRAME: " << frame << endl;
+
+            cout << "\33[32m HASH";
 
             sendfile.add_checksum(frame);
 
-            cout << "\33[32m[DEBUG]: ADDING INDEX" << endl;
+            cout << "\33[32m INDEX";
 
             sendfile.add_index(frame, i);
 
-            cout << "\33[32m[DEBUG]: SENDING FRAME" << endl;
+            cout << "\33[32m FRAME" << endl;
 
-            sendval = send(connfd, sendfile.frames[i], frame_size+16, 0);
+            cout << "\33[32m[DEBUG]: FRAME: " << frame << endl;
+
+            cout << "\33[32m[DEBUG]: FRAME SIZE: " << frame_size+16 << endl;
+
+            cout << "\33[32m[DEBUG]: FRAME INDEX: " << sendfile.get_index(frame) << endl;
+
+            cout << "\33[32m[DEBUG]: HASH TRUE?: " << sendfile.verify_checksum(frame) << endl;
+
+            sendval = write(sockfd, frame, (frame_size+16)*sizeof(char));
+
+            sleep(1);
         }
 
-        cout << "\33[32m[DEBUG]: MUTEX UNLOCK" << endl;
+        recieve_ack();
 
-        //unlock mutex
-        arq_lock.unlock();
+        sleep(1);
 
-        if( recv_ack.joinable() ){
-
-            cout << "\33[32m[DEBUG]: JOINING THREAD" << endl;
-
-            recv_ack.join();
-            return;
-        }
     }
 }
 
@@ -188,6 +176,13 @@ int main(int argc, char const *argv[])
     //first element is hostname and second is port
 
     arq_sock_connect(argv[1],atoi(argv[2]));
+
+    cout << "\33[32m[DEBUG]: CONNECTED TO SERVER, type in y to proceed: ";
+
+    int x;
+
+    cin >> x;
+
     send_file("test.txt");
 
     return 0;

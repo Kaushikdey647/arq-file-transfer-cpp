@@ -24,7 +24,7 @@ mutex arq_lock;
 
 vector<char*> frames;
 
-void arq_socket_listen(const char* ip, int port ){
+void arq_socket_listen(int port ){
     
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -43,11 +43,9 @@ void arq_socket_listen(const char* ip, int port ){
     cout << "\33[32m[DEBUG]: SOCKET STRUCT CREATED" << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT SIZE: " << sizeof(serv_addr) << endl;
     cout << "\33[32m[DEBUG]: SOCKET STRUCT PORT: " << port << endl;
-    cout << "\33[32m[DEBUG]: SOCKET STRUCT IP: " << ip << endl;
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    // serv_addr.sin_addr.s_addr = inet_addr(ip);
     serv_addr.sin_addr.s_addr = htons(INADDR_ANY);
 
     int conn = bind(
@@ -75,7 +73,7 @@ void arq_socket_listen(const char* ip, int port ){
 void send_ack(){
 
     cout << "\33[32m[DEBUG]: SENDING ACK" << endl;
-    send(connfd, ack_values, window_size*sizeof(int), 0);
+    write(connfd, ack_values, window_size*sizeof(int));
     
     cout << "\33[32m[DEBUG]: ACK SENT" << endl;
 
@@ -131,8 +129,10 @@ void recieve_file(const char* folder_path){
     int arr_size = 0;
 
     cout << "\33[32m[DEBUG]: READING ARRAY SIZE" << endl;
+    
+    sendval = read(connfd, &arr_size, sizeof(arr_size));
 
-    sendval = read(connfd, &arr_size, sizeof(int));
+    cout << "\33[32m[DEBUG]: SENDVAL: " << sendval << endl;
 
     cout << "\33[32m[DEBUG]: ARRAY SIZE RECIEVED: " << arr_size << endl;
 
@@ -140,44 +140,53 @@ void recieve_file(const char* folder_path){
 
     frames = vector<char*>(arr_size);
 
+    sleep(1);
+
     while(true){
         //recieve packets
 
         cout << "\33[32m[DEBUG]: READING PACKET" << endl;
 
-        char* packet = new char[frame_size+16];
+        char* packet = new char[frame_size + 16];
 
         cout << "\33[32m[DEBUG]: PACKET CREATED" << endl;
 
-        sendval = read(connfd, packet, frame_size+16);
+        sendval = read(connfd, packet, (frame_size+16)*sizeof(char));
+
+        cout << "\33[32m[DEBUG]: PACKET RECIEVED " << endl;
 
         //get index
 
-        cout << "\33[32m[DEBUG]: GETTING INDEX" << endl;
-
         int index = sendfile.get_index(packet);
 
-        cout << "\33[32m[DEBUG]: PACKET RECIEVED: " << index << endl;
+        cout << "\33[32m INDEX: " << index;
+
+        cout << "\33[32m[DEBUG]: PACKET: " << packet << endl;
 
         //verify checksum and give acknowledgement
 
         if(sendfile.verify_checksum(packet)){
             
-            cout << "\33[32m[DEBUG]: CHECKSUM VERIFIED" << endl;
+            cout << "\33[32m VERIFIED" << endl;
 
             frames[index] = packet;
             ack_values[index-start_index] = 1;
         }
         else{
 
-            cout << "\33[32m[DEBUG]: CHECKSUM FAILED" << endl;
+            cout << "\33[31m DAMAGED" << endl;
 
             //delete packet
             delete[] packet;
             ack_values[index-start_index] = 0;
         }
 
+        sleep(1);
+
         if( (1+index-start_index) == window_size ){
+
+            cout << "\33[32m[DEBUG]: WINDOW FULL" << endl;
+
             // send acknowledgement
             send_ack();
         }
@@ -199,12 +208,12 @@ void recieve_file(const char* folder_path){
 
 int main(int argc, char* argv[]){
 
-    if(argc != 3){
-        cout << "Usage: ./reciever <ip> <port>" << endl;
+    if(argc != 2){
+        cout << "Usage: ./reciever <port>" << endl;
         exit(0);
     }
 
-    arq_socket_listen(argv[1], atoi(argv[2]));
+    arq_socket_listen(atoi(argv[1]));
 
     recieve_file("./");
 
