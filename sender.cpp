@@ -14,12 +14,16 @@ int start_index = 0;
 int* ack_values = new int[window_size];
 int sockfd = 0;
 int connfd = 0;
+float err_prob = 0.5;
 
 vector<char*> frames;
 
 hash<string> hash_fn;
 
 void encode_frames(string file_url){
+
+    // Clean Frames
+    frames.clear();
 
     // OPEN FILE AS BINARY
     ifstream infile(file_url, ios::binary);
@@ -48,20 +52,6 @@ void encode_frames(string file_url){
 
     // CLOSE THE FILE
     infile.close();
-}
-
-void add_error(char* frame, int p){
-    //choose a random number between 0 and 1
-    float r = (float)rand()/(float)RAND_MAX;
-
-    //if r is less than p, add error
-    if(r < p){
-        //choose a random index
-        int index = rand() % frame_size;
-
-        //flip the bit
-        frame[index] = frame[index] ^ 1;
-    }
 }
 
 void arq_sock_connect(const char* ip, int port ){
@@ -116,10 +106,18 @@ void arq_sock_connect(const char* ip, int port ){
     }
 }
 
-void send_file(string file_url){
+int send_file(string file_url){
     int sendval;
-
+    int itrnum = 0;
     encode_frames(file_url);
+
+    //refresh start_index and ack_values
+
+    start_index = 0;
+    
+    for(int i=0; i<window_size; i++){
+        ack_values[i] = 0;
+    }
 
     cout << "\33[32m[DEBUG]: ENCODED FRAMES" << endl;
 
@@ -132,6 +130,14 @@ void send_file(string file_url){
     cout << "\33[32m[DEBUG]: SENDVAL: " << sendval << endl;
 
     cout << "\33[32m[DEBUG]: SENT ARRAY SIZE: " << array_size << endl;
+
+    //send frame size:
+
+    sendval = write(sockfd, &frame_size, sizeof(frame_size));
+
+    cout << "\33[32m[DEBUG]: SENDVAL: " << sendval << endl;
+
+    cout << "\33[32m[DEBUG]: SENT FRAME SIZE: " << frame_size << endl;
     
     // sleep(1);
 
@@ -140,28 +146,45 @@ void send_file(string file_url){
     while(true){
 
         for(int i=start_index; i<start_index+window_size && i < array_size; i++){
-            char* frame = frames[i];
+            char* frame = new char[frame_size + 16]; // keeping window for appending hash and index
+
+            // copy frame from vector
+            memcpy(frame, frames[i], frame_size*sizeof(char));
+
             // add hash
 
-            cout << "\33[32m[DEBUG]: FRAME: " << i << endl;
-
-            cout << "\33[32m HASH";
+            cout << "\33[32m [" << i <<  "]:";
 
             // ADD CHECKSUM
 
-            size_t hash = hash_fn(frame);
+            size_t hash = hash_fn(string(frame,frame_size));
 
             memcpy(frame+frame_size+8, &hash, 8*sizeof(char));
-
-            cout << "\33[32m INDEX";
 
             // ADD INDEX
 
             memcpy(frame+frame_size, &i, 8*sizeof(char));
 
-            cout << "\33[32m FRAME" << endl;
-            sendval = write(sockfd, frame, (frame_size+16)*sizeof(char));
+            // ADD ERROR
 
+            float r = (float)rand()/(float)RAND_MAX;
+
+            if(r < err_prob){
+                //choose a random index
+                int err_ind = rand() % frame_size;
+                //flip the bit
+                frame[err_ind] = frame[err_ind] ^ 1;
+                cout << "\33[31m ERR" << endl;
+            }
+            else{
+                cout << "\33[32m NOERR" << endl;
+            }
+
+            sendval = write(sockfd, frame, (frame_size+16)*sizeof(char));
+            
+            delete[] frame;
+            
+            itrnum += 1;
             // sleep(1);
         }
 
@@ -184,35 +207,103 @@ void send_file(string file_url){
         // update start_index
         for(int i=0; i<window_size; i++){
             if(ack_values[i] == 1){
-                start_index++;
-                if (start_index == frames.size()){
-                    return;
-                }
+                start_index += 1;
             }else{
                 break;
             }
         }
 
-        // terminate condition
-        if (start_index == frames.size()){
-            cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED: EXITING PROGRAM!" << endl;
-            return;
-        }
+        cout << "\33[32m[DEBUG]: START INDEX: " << start_index << endl;
+        cout << "\33[32m[DEBUG]: ARRAY SIZE: " << array_size << endl;
 
-        cout << "\33[32m UPDATE ";
+        // terminate condition
+        if (start_index >= frames.size()){
+            cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED: EXITING PROGRAM!" << endl;
+            return itrnum;
+        }
 
         // flush the ack values
         for(int i=0; i<window_size; i++){
             ack_values[i] = 0;
         }
 
-        cout << "\33[32m FLUSH" << endl;
-
-        // sleep(1);
-
     }
 }
 
+// ITERATORS START HERE
+
+void iterate_thru_probs(){
+
+    //create a logfile
+    ofstream logfile("itr_prob_log.csv");
+
+    logfile << "ERROR_PROBABILITY,TRANSMISSIONS" << endl;
+
+    for(err_prob = 0.000; err_prob <= 0.950; err_prob += 0.001){
+        logfile << err_prob << "," << send_file("test.txt") << endl;
+    }
+
+}
+
+void iterate_thru_packet_size(){
+    err_prob = 0.2;
+    //create a logfile
+    ofstream logfile("itr_packet_size_log.csv");
+
+    logfile << "PACKET_SIZE,TRANSMISSIONS" << endl;
+
+    for(frame_size = 8; frame_size <= 512; frame_size += 2){
+        logfile << frame_size << "," << send_file("test.txt") << endl;
+    }
+}
+
+void iterate_thru_packet_size_and_file_size(){
+    err_prob = 0;
+    //create logfile
+    ofstream logfile("itr_packet_size_file_size_log.csv");
+
+    logfile << "FILE_SIZE,PACKET_SIZE,TRANSMISSIONS" << endl;
+
+    //ITERATE THROUGH FILE SIZE
+    for(int i = 1; i < 64; i++){
+        //create a binary file of size i KB
+        ofstream file("tempfile", ios::binary);
+        //fill the file with gibberish
+        for(int j = 0; j < i*1024; j++){
+            file << (char)rand();
+        }
+        file.close();
+        //ITERATE THROUGH PACKET SIZE
+        for(frame_size = 8; frame_size <= 512; frame_size += 8){
+            logfile << i << "," << frame_size << "," << send_file("tempfile") << endl;
+        }
+    }
+    //delete the file
+    remove("tempfile");
+}
+
+void iterate_thru_file_size(){
+    err_prob = 0;
+
+    //create a logfile
+    ofstream logfile("itr_file_size_log.csv");
+
+    logfile << "FILE_SIZE,TRANSMISSIONS" << endl;
+
+    for(int i = 1; i < 128; i++){
+        //create a binary file of size i KB
+        ofstream file("tempfile", ios::binary);
+        //fill the file with gibberish
+        for(int j = 0; j < i*1024; j++){
+            file << (char)rand();
+        }
+        file.close();
+        logfile << i << "," << send_file("tempfile") << endl;
+    }
+
+    //delete the file
+    remove("tempfile");
+}
 
 int main(int argc, char const *argv[])
 {
@@ -220,13 +311,29 @@ int main(int argc, char const *argv[])
 
     arq_sock_connect(argv[1],atoi(argv[2]));
 
-    cout << "\33[32m[DEBUG]: CONNECTED TO SERVER, type in y to proceed: ";
+    cout << "\33[32m[DEBUG]: CONNECTED TO SERVER, what are we logging against number of transmissions today?" << endl;
 
-    int x;
+    cout << "\33[32m[DEBUG]: OPTIONS: bep, packet size, file size, packet size and file size" << endl;
 
-    cin >> x;
+    cout << "\33[32m[DEBUG]: ENTER LOG TYPE: " << endl;
 
-    send_file("test.txt");
+    string log_type;
+    cin >> log_type;
+    
+
+    if(log_type == "bep"){
+        iterate_thru_probs();
+    }else if(log_type == "packet size"){
+        iterate_thru_packet_size();
+    }else if(log_type == "file size"){
+        iterate_thru_file_size();
+    }else if(log_type == "packet size and file_size"){
+        iterate_thru_packet_size_and_file_size();
+    }else{
+        cout << "\33[31m[ERROR]: INVALID LOG TYPE" << endl;
+    }
+
+    iterate_thru_packet_size_and_file_size();
 
     return 0;
 }

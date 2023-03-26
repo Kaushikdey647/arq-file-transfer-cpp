@@ -85,14 +85,6 @@ void arq_socket_listen(int port ){
         cout << "\33[31m[ERROR]: FAILED TO LISTEN" << endl;
         exit(0);
     }
-}
-
-
-void recieve_file(const char* folder_path){
-
-    int sendval;
-
-    // ACCEPT A NEW CONNECTION
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
@@ -109,6 +101,21 @@ void recieve_file(const char* folder_path){
     }
 
     cout << "\33[32m[DEBUG]: CONNECTION ACCEPTED" << endl;
+}
+
+
+void recieve_file(const char* folder_path){
+
+    int sendval;
+
+    // ACCEPT A NEW CONNECTION
+
+    //refresh the start_index and ack_values
+    start_index = 0;
+    delete[] ack_values;
+    ack_values = new int[window_size];
+
+
 
     // INITIALIZE AND RECIEVE
 
@@ -117,8 +124,14 @@ void recieve_file(const char* folder_path){
     sendval = read(connfd, &array_size, sizeof(array_size));
     cout << "\33[32m[DEBUG]: ARRAY SIZE RECIEVED: " << array_size << endl;
 
-    //initialize the frames vector
+    // RECIEVE FRAME SIZE
 
+    cout << "\33[32m[DEBUG]: READING FRAME SIZE" << endl;
+    sendval = read(connfd, &frame_size, sizeof(frame_size));
+    cout << "\33[32m[DEBUG]: FRAME SIZE RECIEVED: " << frame_size << endl;
+
+    //clear and reinitialize the frames vector
+    frames.clear();
     frames = vector<char*>(array_size);
 
     // sleep(1);
@@ -129,30 +142,29 @@ void recieve_file(const char* folder_path){
         //recieve packets
         char* packet = new char[frame_size + 16];
         sendval = read(connfd, packet, (frame_size+16)*sizeof(char));
-        cout << "\33[32m[DEBUG]: PACKET RECIEVED " << endl;
-
+        if (sendval < 0) {
+            cout << "\33[31m[ERROR]: CONNECTION ERROR" << endl;
+            exit(0);
+        }
         //get index
         int index;
         memcpy(&index, packet+frame_size, 8*sizeof(char));
-        cout << "\33[32m INDEX: " << index;
+        cout << "\33[32m [" << index << "]: RECV";
         
-        //verify checksum and give acknowledgement
+        //verify checksum
         size_t act_hash, rec_hash; // actual hash, received hash
-        char* temp = new char[frame_size]; //allot memory
-        memcpy(temp, packet, (frame_size)*sizeof(char)); //copy data
-        act_hash = hash_fn(temp); //get hash
-        delete[] temp; //delete alloted memory
+        act_hash = hash_fn( string(packet,frame_size) ); //get hash
         memcpy(&rec_hash, packet+frame_size+8, 8*sizeof(char));
 
         if(act_hash == rec_hash){
             
-            cout << "\33[32m VERIFIED" << endl;
+            cout << "\33[32m VER" << endl;
             frames[index] = packet;
             ack_values[index-start_index] = 1;
-            }
+        }
         else{
 
-            cout << "\33[31m DAMAGED" << endl;
+            cout << "\33[31m DMG" << endl;
 
             //delete packet
             delete[] packet;
@@ -181,11 +193,25 @@ void recieve_file(const char* folder_path){
 
             //terminate condition
 
-            if (index == array_size-1 && ack_values[index-start_index] == 1){
+            if (index == array_size-1){
                 
-                cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED! WRITING TO FILE" << endl;
-                decode_frames(folder_path);
-                return;
+                bool ack_recieved = true;
+
+                //All ACKS recieved
+                for(int i=0; (i < window_size) && (i < array_size - start_index); i++){
+                    if(ack_values[i] == 0){
+                        ack_recieved = false;
+                        break;
+                    }
+                }
+                
+                if(ack_recieved){
+                    cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED! WRITING TO FILE" << endl;
+                    if(folder_path != ""){
+                        decode_frames(folder_path);
+                    }
+                    return;
+                }
             }
 
             //reset the start_index from first zero
@@ -203,7 +229,7 @@ void recieve_file(const char* folder_path){
                 ack_values[i] = 0;
             }
 
-            cout << "\33[32m[DEBUG]: START INDEX RESET TO: " << start_index << endl;
+            cout << "\33[32m[DEBUG]: START_INDEX: " << start_index << endl;
 
         }
 
@@ -222,8 +248,11 @@ int main(int argc, char* argv[]){
     }
 
     arq_socket_listen(atoi(argv[1]));
-
-    recieve_file("./");
+    while (true)
+    {
+        recieve_file("");
+    }
+    
 
     return 0;
 }
