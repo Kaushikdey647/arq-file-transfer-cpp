@@ -8,18 +8,11 @@
 using namespace std;
 
 int window_size = 8;
-
 int frame_size = 128;
-
 int start_index = 0;
-
 int* ack_values = new int[window_size];
-
 int sockfd = 0;
-
 int connfd = 0;
-
-mutex arq_lock;
 
 vector<char*> frames;
 
@@ -94,19 +87,6 @@ void arq_socket_listen(int port ){
     }
 }
 
-void add_error(char* frame, int p){
-    //choose a random number between 0 and 1
-    float r = (float)rand()/(float)RAND_MAX;
-
-    //if r is less than p, add error
-    if(r < p){
-        //choose a random index
-        int index = rand() % frame_size;
-
-        //flip the bit
-        frame[index] = frame[index] ^ 1;
-    }
-}
 
 void recieve_file(const char* folder_path){
 
@@ -158,10 +138,9 @@ void recieve_file(const char* folder_path){
         
         //verify checksum and give acknowledgement
         size_t act_hash, rec_hash; // actual hash, received hash
-        char* temp = new char[frame_size+8]; //allot memory for hashing
-        memcpy(temp, packet, (frame_size+8)*sizeof(char));
-        act_hash = hash_fn(temp);
-
+        char* temp = new char[frame_size]; //allot memory
+        memcpy(temp, packet, (frame_size)*sizeof(char)); //copy data
+        act_hash = hash_fn(temp); //get hash
         delete[] temp; //delete alloted memory
         memcpy(&rec_hash, packet+frame_size+8, 8*sizeof(char));
 

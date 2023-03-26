@@ -1,6 +1,5 @@
 #include <bits/stdc++.h>
 #include <sys/socket.h> // for socket
-#include <sys/types.h>
 #include <netinet/in.h> // for sockaddr_in
 #include <arpa/inet.h>  // for inet_addr and htons
 #include <netdb.h>
@@ -10,18 +9,11 @@
 using namespace std;
 
 int window_size = 8;
-
 int frame_size = 128;
-
 int start_index = 0;
-
 int* ack_values = new int[window_size];
-
 int sockfd = 0;
-
 int connfd = 0;
-
-mutex arq_lock;
 
 vector<char*> frames;
 
@@ -56,6 +48,20 @@ void encode_frames(string file_url){
 
     // CLOSE THE FILE
     infile.close();
+}
+
+void add_error(char* frame, int p){
+    //choose a random number between 0 and 1
+    float r = (float)rand()/(float)RAND_MAX;
+
+    //if r is less than p, add error
+    if(r < p){
+        //choose a random index
+        int index = rand() % frame_size;
+
+        //flip the bit
+        frame[index] = frame[index] ^ 1;
+    }
 }
 
 void arq_sock_connect(const char* ip, int port ){
