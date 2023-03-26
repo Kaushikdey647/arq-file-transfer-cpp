@@ -1,4 +1,3 @@
-#include "lib/framing.h"
 #include <bits/stdc++.h>
 #include <sys/socket.h> // for socket
 #include <netinet/in.h> // for sockaddr_in
@@ -23,6 +22,31 @@ int connfd = 0;
 mutex arq_lock;
 
 vector<char*> frames;
+
+hash<string> hash_fn;
+
+void decode_frames(string path_url){
+
+    //fetch the extension
+
+    char* ext = new char[8];
+    memcpy(ext, frames[0], 8*sizeof(char));
+
+    // generate a random string
+    string rand_str = to_string(rand());
+
+    // create a new file
+    ofstream outfile(path_url + rand_str + "." + ext, ios::binary);
+
+    //append the data from the binary array
+    for(int i = 1; i < frames.size(); i++){
+        outfile.write(frames[i], frame_size*sizeof(char));
+    }
+
+    // close the file
+    outfile.close();
+
+}
 
 void arq_socket_listen(int port ){
     
@@ -88,8 +112,6 @@ void recieve_file(const char* folder_path){
 
     int sendval;
 
-    framing sendfile(frame_size);
-
     // ACCEPT A NEW CONNECTION
 
     struct sockaddr_in client_addr;
@@ -110,52 +132,45 @@ void recieve_file(const char* folder_path){
 
     // INITIALIZE AND RECIEVE
 
-    int arr_size = 0;
-
+    int array_size = 0;
     cout << "\33[32m[DEBUG]: READING ARRAY SIZE" << endl;
-    
-    sendval = read(connfd, &arr_size, sizeof(arr_size));
-
-    cout << "\33[32m[DEBUG]: SENDVAL: " << sendval << endl;
-
-    cout << "\33[32m[DEBUG]: ARRAY SIZE RECIEVED: " << arr_size << endl;
+    sendval = read(connfd, &array_size, sizeof(array_size));
+    cout << "\33[32m[DEBUG]: ARRAY SIZE RECIEVED: " << array_size << endl;
 
     //initialize the frames vector
 
-    frames = vector<char*>(arr_size);
+    frames = vector<char*>(array_size);
 
-    sleep(1);
-
+    // sleep(1);
+    
+    
     while(true){
+
         //recieve packets
-
-        cout << "\33[32m[DEBUG]: READING PACKET" << endl;
-
         char* packet = new char[frame_size + 16];
-
-        cout << "\33[32m[DEBUG]: PACKET CREATED" << endl;
-
         sendval = read(connfd, packet, (frame_size+16)*sizeof(char));
-
         cout << "\33[32m[DEBUG]: PACKET RECIEVED " << endl;
 
         //get index
-
         int index;
-
         memcpy(&index, packet+frame_size, 8*sizeof(char));
-
         cout << "\33[32m INDEX: " << index;
-
+        
         //verify checksum and give acknowledgement
+        size_t act_hash, rec_hash; // actual hash, received hash
+        char* temp = new char[frame_size+8]; //allot memory for hashing
+        memcpy(temp, packet, (frame_size+8)*sizeof(char));
+        act_hash = hash_fn(temp);
 
-        if(sendfile.verify_checksum(packet)){
+        delete[] temp; //delete alloted memory
+        memcpy(&rec_hash, packet+frame_size+8, 8*sizeof(char));
+
+        if(act_hash == rec_hash){
             
             cout << "\33[32m VERIFIED" << endl;
-
             frames[index] = packet;
             ack_values[index-start_index] = 1;
-        }
+            }
         else{
 
             cout << "\33[31m DAMAGED" << endl;
@@ -165,32 +180,34 @@ void recieve_file(const char* folder_path){
             ack_values[index-start_index] = 0;
         }
 
-        sleep(1);
+        // sleep(1);
 
         //SEND ACK AFTER A FULL WINDOW
 
-        if( (1+index-start_index) == window_size ){
+        if( (1+index-start_index) == window_size || index == array_size-1 ){
 
 
-            cout << "\33[32m[DEBUG]: WINDOW FULL" << endl;
-
-
+            cout << "\33[32m[DEBUG]: WINDOW FULL, SENDING ACK: " << endl;
             cout << "INDEX:\t";
-            for(int i = start_index; i < start_index+window_size; i++){
+            for(int i = start_index; (i < start_index+window_size) && (i < array_size); i++){
                 cout << i << " ";
             }
             cout << "\nACK:\t";
-            for(int i = start_index; i < start_index+window_size; i++){
+            for(int i = 0; (i < window_size) && (i < array_size - start_index); i++){
                 cout << ack_values[i] << " ";
             }
             cout << endl;
-
-            cout << "\33[32m[DEBUG]: SENDING ACK" << endl;
             write(connfd, ack_values, window_size*sizeof(int));
-            
-            cout << "\33[32m[DEBUG]: ACK SENT" << endl;
 
 
+            //terminate condition
+
+            if (index == array_size-1 && ack_values[index-start_index] == 1){
+                
+                cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED! WRITING TO FILE" << endl;
+                decode_frames(folder_path);
+                return;
+            }
 
             //reset the start_index from first zero
             for(int i=0; i<window_size; i++){
@@ -207,24 +224,14 @@ void recieve_file(const char* folder_path){
                 ack_values[i] = 0;
             }
 
-            cout << "\33[32m[DEBUG]: ACK VALUES RESET" << endl;
-
             cout << "\33[32m[DEBUG]: START INDEX RESET TO: " << start_index << endl;
 
         }
 
-        //terminate condition
 
-        if (index == arr_size-1){
-            break;
-        }
     }
 
-    sendfile.frames = frames;
 
-    cout << "\33[32m[DEBUG]: WRITING TO FILE" << endl;
-
-    sendfile.decode_frames(folder_path);
 }
 
 

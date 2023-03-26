@@ -1,4 +1,3 @@
-#include "lib/framing.h"
 #include <bits/stdc++.h>
 #include <sys/socket.h> // for socket
 #include <sys/types.h>
@@ -25,6 +24,39 @@ int connfd = 0;
 mutex arq_lock;
 
 vector<char*> frames;
+
+hash<string> hash_fn;
+
+void encode_frames(string file_url){
+
+    // OPEN FILE AS BINARY
+    ifstream infile(file_url, ios::binary);
+
+    if (!infile.is_open())
+    {
+        throw "File not found";
+    }
+
+    // PUSH EXTENSION INTO THE VECTOR
+    char* ext = new char[frame_size + 16];
+    memcpy(ext, file_url.substr(file_url.find_last_of(".")+1).c_str(), frame_size*sizeof(char));
+    
+    frames.push_back(ext);
+
+
+    // READ INTO THE BUFFER AND PUSH TO THE VECTOR
+    char* buffer = new char[ frame_size ];
+
+    while (infile.read(buffer, frame_size*sizeof(char)))
+    {
+        char* new_buffer = new char[frame_size + 16]; // keeping window for appending hash
+        memcpy(new_buffer, buffer, frame_size*sizeof(char));
+        frames.push_back(new_buffer);
+    }
+
+    // CLOSE THE FILE
+    infile.close();
+}
 
 void arq_sock_connect(const char* ip, int port ){
     
@@ -81,18 +113,13 @@ void arq_sock_connect(const char* ip, int port ){
 void send_file(string file_url){
     int sendval;
 
-    framing sendfile(frame_size);
-
-    sendfile.encode_frames(file_url);
+    encode_frames(file_url);
 
     cout << "\33[32m[DEBUG]: ENCODED FRAMES" << endl;
 
-    //copyy sendfile.frames to frames
-    frames = sendfile.frames;
-
     //send array size:
 
-    int array_size = sendfile.frames.size();
+    int array_size = frames.size();
     
     sendval = write(sockfd, &array_size, sizeof(array_size));
 
@@ -100,44 +127,50 @@ void send_file(string file_url){
 
     cout << "\33[32m[DEBUG]: SENT ARRAY SIZE: " << array_size << endl;
     
-    sleep(1);
+    // sleep(1);
 
     //send frames
 
     while(true){
 
-        for(int i=start_index; i<start_index+window_size; i++){
-            char* frame = sendfile.frames[i];
+        for(int i=start_index; i<start_index+window_size && i < array_size; i++){
+            char* frame = frames[i];
             // add hash
 
             cout << "\33[32m[DEBUG]: FRAME: " << i << endl;
 
             cout << "\33[32m HASH";
 
-            sendfile.add_checksum(frame);
+            // ADD CHECKSUM
+
+            size_t hash = hash_fn(frame);
+
+            memcpy(frame+frame_size+8, &hash, 8*sizeof(char));
 
             cout << "\33[32m INDEX";
 
-            sendfile.add_index(frame, i);
+            // ADD INDEX
+
+            memcpy(frame+frame_size, &i, 8*sizeof(char));
 
             cout << "\33[32m FRAME" << endl;
             sendval = write(sockfd, frame, (frame_size+16)*sizeof(char));
 
-            sleep(1);
+            // sleep(1);
         }
 
         //RECIEVE ACK
 
-        int ack = read(sockfd, ack_values, window_size);
+        int ack = read(sockfd, ack_values, window_size*sizeof(int));
 
         cout << "\33[32m[DEBUG]: ACK READ VALUE: " << ack << endl;
 
         cout << "INDEX:\t";
-        for(int i = start_index; i < start_index+window_size; i++){
+        for(int i = start_index; (i < start_index+window_size) && (i < array_size); i++){
             cout << i << " ";
         }
         cout << "\nACK:\t";
-        for(int i = start_index; i < start_index+window_size; i++){
+        for(int i = 0; (i < window_size) && (i < array_size - start_index); i++){
             cout << ack_values[i] << " ";
         }
         cout << endl;
@@ -154,6 +187,12 @@ void send_file(string file_url){
             }
         }
 
+        // terminate condition
+        if (start_index == frames.size()){
+            cout << "\33[32m[DEBUG]: TRANSMISSION COMPLETED: EXITING PROGRAM!" << endl;
+            return;
+        }
+
         cout << "\33[32m UPDATE ";
 
         // flush the ack values
@@ -163,7 +202,7 @@ void send_file(string file_url){
 
         cout << "\33[32m FLUSH" << endl;
 
-        sleep(1);
+        // sleep(1);
 
     }
 }
