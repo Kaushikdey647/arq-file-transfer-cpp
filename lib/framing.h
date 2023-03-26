@@ -64,20 +64,23 @@ class framing{
             size_t hash = hash_fn(frame);
 
             // convert hash to char array
-            memcpy(frame+frame_size, &hash, 8*sizeof(char));
+            memcpy(frame+frame_size+8, &hash, 8*sizeof(char));
 
         }
 
         void add_index(char* frame, int index){
             int temp = index;
             // convert hash to char array
-            memcpy(frame+frame_size+8, &temp, 8*sizeof(char));
+            memcpy(frame+frame_size, &temp, 8*sizeof(char));
     
         }
 
         int get_index(char* frame){
             int index;
-            memcpy(&index, frame+frame_size+8, 8*sizeof(char));
+
+            cout << "SOMETHING" << endl;
+            memcpy(&index, frame+frame_size, 8*sizeof(char));
+            
             return index;
         }
 
@@ -85,13 +88,13 @@ class framing{
 
             size_t act_hash, rec_hash; // actual hash, received hash
 
-            char* temp = new char[frame_size];
+            char* temp = new char[frame_size+8];
             
-            memcpy(temp, frame, frame_size*sizeof(char));
+            memcpy(temp, frame, (frame_size+8)*sizeof(char));
 
             act_hash = hash_fn(temp);
 
-            memcpy(&rec_hash, frame+frame_size, 8*sizeof(char));
+            memcpy(&rec_hash, frame+frame_size+8, 8*sizeof(char));
 
             return act_hash == rec_hash;
         }

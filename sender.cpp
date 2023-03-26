@@ -78,34 +78,6 @@ void arq_sock_connect(const char* ip, int port ){
     }
 }
 
-void recieve_ack(){
-
-    int ack = read(sockfd, ack_values, window_size);
-
-    cout << "\33[32m[DEBUG]: ACK READ VALUE: " << ack << endl;
-
-    // update start_index
-    for(int i=0; i<window_size; i++){
-        if(ack_values[i] == 1){
-            start_index++;
-            if (start_index == frames.size()){
-                return;
-            }
-        }else{
-            break;
-        }
-    }
-
-    cout << "\33[32m UPDATE ";
-
-    // flush the ack values
-    for(int i=0; i<window_size; i++){
-        ack_values[i] = 0;
-    }
-
-    cout << "\33[32m FLUSH" << endl;
-}
-
 void send_file(string file_url){
     int sendval;
 
@@ -138,7 +110,7 @@ void send_file(string file_url){
             char* frame = sendfile.frames[i];
             // add hash
 
-            cout << "\33[32m[DEBUG]: FRAME: " << frame << endl;
+            cout << "\33[32m[DEBUG]: FRAME: " << i << endl;
 
             cout << "\33[32m HASH";
 
@@ -149,21 +121,47 @@ void send_file(string file_url){
             sendfile.add_index(frame, i);
 
             cout << "\33[32m FRAME" << endl;
-
-            cout << "\33[32m[DEBUG]: FRAME: " << frame << endl;
-
-            cout << "\33[32m[DEBUG]: FRAME SIZE: " << frame_size+16 << endl;
-
-            cout << "\33[32m[DEBUG]: FRAME INDEX: " << sendfile.get_index(frame) << endl;
-
-            cout << "\33[32m[DEBUG]: HASH TRUE?: " << sendfile.verify_checksum(frame) << endl;
-
             sendval = write(sockfd, frame, (frame_size+16)*sizeof(char));
 
             sleep(1);
         }
 
-        recieve_ack();
+        //RECIEVE ACK
+
+        int ack = read(sockfd, ack_values, window_size);
+
+        cout << "\33[32m[DEBUG]: ACK READ VALUE: " << ack << endl;
+
+        cout << "INDEX:\t";
+        for(int i = start_index; i < start_index+window_size; i++){
+            cout << i << " ";
+        }
+        cout << "\nACK:\t";
+        for(int i = start_index; i < start_index+window_size; i++){
+            cout << ack_values[i] << " ";
+        }
+        cout << endl;
+
+        // update start_index
+        for(int i=0; i<window_size; i++){
+            if(ack_values[i] == 1){
+                start_index++;
+                if (start_index == frames.size()){
+                    return;
+                }
+            }else{
+                break;
+            }
+        }
+
+        cout << "\33[32m UPDATE ";
+
+        // flush the ack values
+        for(int i=0; i<window_size; i++){
+            ack_values[i] = 0;
+        }
+
+        cout << "\33[32m FLUSH" << endl;
 
         sleep(1);
 

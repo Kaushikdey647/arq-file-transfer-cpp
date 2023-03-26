@@ -70,34 +70,27 @@ void arq_socket_listen(int port ){
     }
 }
 
-void send_ack(){
+void add_error(char* frame, int p){
+    //choose a random number between 0 and 1
+    float r = (float)rand()/(float)RAND_MAX;
 
-    cout << "\33[32m[DEBUG]: SENDING ACK" << endl;
-    write(connfd, ack_values, window_size*sizeof(int));
-    
-    cout << "\33[32m[DEBUG]: ACK SENT" << endl;
+    //if r is less than p, add error
+    if(r < p){
+        //choose a random index
+        int index = rand() % frame_size;
 
-    //reset the ack_values array
-    for(int i=0; i<window_size; i++){
-        ack_values[i] = 0;
+        //flip the bit
+        frame[index] = frame[index] ^ 1;
     }
-
-    cout << "\33[32m[DEBUG]: ACK VALUES RESET" << endl;
-
-    //reset the start_index from first zero
-    for(int i=0; i<window_size; i++){
-        if(ack_values[i] == 1){
-            start_index++;
-        }
-        else{
-            break;
-        }
-    }
-
-    cout << "\33[32m[DEBUG]: START INDEX RESET" << endl;
 }
 
-void accept_conn(){
+void recieve_file(const char* folder_path){
+
+    int sendval;
+
+    framing sendfile(frame_size);
+
+    // ACCEPT A NEW CONNECTION
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
@@ -115,16 +108,7 @@ void accept_conn(){
 
     cout << "\33[32m[DEBUG]: CONNECTION ACCEPTED" << endl;
 
-}
-
-void recieve_file(const char* folder_path){
-
-    int sendval;
-
-    framing sendfile(frame_size);
-    //recieve array size
-
-    accept_conn();
+    // INITIALIZE AND RECIEVE
 
     int arr_size = 0;
 
@@ -157,11 +141,11 @@ void recieve_file(const char* folder_path){
 
         //get index
 
-        int index = sendfile.get_index(packet);
+        int index;
+
+        memcpy(&index, packet+frame_size, 8*sizeof(char));
 
         cout << "\33[32m INDEX: " << index;
-
-        cout << "\33[32m[DEBUG]: PACKET: " << packet << endl;
 
         //verify checksum and give acknowledgement
 
@@ -183,12 +167,50 @@ void recieve_file(const char* folder_path){
 
         sleep(1);
 
+        //SEND ACK AFTER A FULL WINDOW
+
         if( (1+index-start_index) == window_size ){
+
 
             cout << "\33[32m[DEBUG]: WINDOW FULL" << endl;
 
-            // send acknowledgement
-            send_ack();
+
+            cout << "INDEX:\t";
+            for(int i = start_index; i < start_index+window_size; i++){
+                cout << i << " ";
+            }
+            cout << "\nACK:\t";
+            for(int i = start_index; i < start_index+window_size; i++){
+                cout << ack_values[i] << " ";
+            }
+            cout << endl;
+
+            cout << "\33[32m[DEBUG]: SENDING ACK" << endl;
+            write(connfd, ack_values, window_size*sizeof(int));
+            
+            cout << "\33[32m[DEBUG]: ACK SENT" << endl;
+
+
+
+            //reset the start_index from first zero
+            for(int i=0; i<window_size; i++){
+                if(ack_values[i] == 1){
+                    start_index++;
+                }
+                else{
+                    break;
+                }
+            }
+
+            //reset the ack_values array
+            for(int i=0; i<window_size; i++){
+                ack_values[i] = 0;
+            }
+
+            cout << "\33[32m[DEBUG]: ACK VALUES RESET" << endl;
+
+            cout << "\33[32m[DEBUG]: START INDEX RESET TO: " << start_index << endl;
+
         }
 
         //terminate condition

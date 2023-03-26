@@ -8,3 +8,5 @@ What we created here is a go-back N protocol for file transfer. The sender sends
 - run `g++ reciever.cpp -pthread -o bin/reciever && ./bin/reciever 8080`
 
 - run `g++ sender.cpp -pthread -o bin/sender && ./bin/sender localhost 8080`
+
+- run `g++ test.cpp -o bin/test && ./bin/test`
