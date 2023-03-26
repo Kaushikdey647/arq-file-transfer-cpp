@@ -1,7 +1,12 @@
+#include <vector>
+#include <cstring>
 #include <sys/socket.h> // for socket
 #include <netinet/in.h> // for sockaddr_in
 #include <arpa/inet.h>  // for inet_addr and htons
 #include <netdb.h>
+#include <fstream>
+#include <algorithm>
+#include <stdio.h>
 #include <unistd.h> //for close and shit
 #include <iostream>
 #include <functional>
