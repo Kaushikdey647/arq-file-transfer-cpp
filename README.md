@@ -9,12 +9,6 @@ What we created here is a go-back N protocol for file transfer. The sender sends
 
 - run `g++ arq.cpp -pthread -g -o bin/arq`
 
-- run `./bin/arq s 8080 ./`
+- to expose port to client to recieve files `./bin/arq s <server-port> <file download path>`
 
-- run `./bin/arq c localhost 8080 ./test.txt`
-
-### BUILD PYTHON MODULE
-
-- run `python setup.py build_ext --inplace`
-
-- run `python setup.py install`
+- to upload a file to a server run `./bin/arq c <server-ip> <server-port> <file upload path>`
