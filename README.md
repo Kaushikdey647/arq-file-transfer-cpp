@@ -7,7 +7,7 @@ What we created here is a go-back N protocol for file transfer. The sender sends
 
 ### C++ CLI APPLICATION
 
-- run `g++ arq.cpp -pthread -g -o bin/arq`
+- run `g++ arq.cpp -pthread -g -o bin/arq` ( don't forget to mkdir a bin folder first, I didn't have the time to take care of that )
 
 - to expose port to client to recieve files `./bin/arq s <server-port> <file download path>`
 
